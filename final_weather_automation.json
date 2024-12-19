@@ -1,0 +1,231 @@
+[
+    {
+        "id": "a304e950f9d14c80",
+        "type": "http request",
+        "z": "7ef85877f7233213",
+        "name": "Get Weather Data",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://api.weatherapi.com/v1/astronomy.json?key=5b3f47983ab847688e2211049241912&q=Cracow&aqi=no",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 230,
+        "y": 280,
+        "wires": [
+            [
+                "5b2872a86edc0ab3",
+                "375f696088bed960"
+            ]
+        ]
+    },
+    {
+        "id": "5b2872a86edc0ab3",
+        "type": "function",
+        "z": "7ef85877f7233213",
+        "name": "Check Sunset",
+        "func": "const sunset = msg.payload.astronomy.astro.sunset; // Extract sunset\nconst isSunUp = msg.payload.astronomy.astro.is_sun_up; // Extract is_sun_up\n\n// Parse sunset time into a Date object\nconst sunsetParts = sunset.trim().split(/[: ]/); // Split \"03:30 PM\" into [03, 30, PM]\nconst sunsetHour = parseInt(sunsetParts[0], 10);\nconst sunsetMinute = parseInt(sunsetParts[1], 10);\nconst sunsetPeriod = sunsetParts[2].toUpperCase(); // Ensure PM/AM is uppercase\n\n// Convert hour to 24-hour format\nlet sunset24Hour = sunsetHour;\nif (sunsetPeriod === \"PM\" && sunsetHour !== 12) {\n    sunset24Hour += 12;\n}\nif (sunsetPeriod === \"AM\" && sunsetHour === 12) {\n    sunset24Hour = 0;\n}\n\n// Create sunset Date object for today\nconst currentTime = new Date(); // Current time\nconst sunsetTime = new Date(currentTime); // Base Date object for today's sunset\nsunsetTime.setHours(sunset24Hour);\nsunsetTime.setMinutes(sunsetMinute);\nsunsetTime.setSeconds(0);\n\n// Debug: Log times for verification\nnode.warn(`Current Time: ${currentTime}`);\nnode.warn(`Sunset Time: ${sunsetTime}`);\n\n// Check if current time is past sunset or if the sun is down\nif (currentTime > sunsetTime || isSunUp === 0) {\n    // Action to close windows and blinds\n    msg.payload = {\n        status: \"Automated action triggered\",\n        details: \"Sunset detected. Windows closed, blinds lowered\",\n        action: \"close\",\n        devices: [\"windows\", \"blinds\"]\n    };\n    return msg; // Send to the MQTT Out node\n} else {\n    // No action needed\n    msg.payload = {\n        status: \"No action needed\",\n        details: \"Sun is still up. No action taken\",\n        action: \"none\"\n    };\n    return msg; // Send to the MQTT Out node\n}\n",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 480,
+        "y": 280,
+        "wires": [
+            [
+                "b719e4d7cac76677",
+                "ee33f37e7f6fc9be",
+                "8820a4b0de22cc3d"
+            ],
+            [
+                "14c75bcd1b4e2b89"
+            ]
+        ]
+    },
+    {
+        "id": "b719e4d7cac76677",
+        "type": "debug",
+        "z": "7ef85877f7233213",
+        "name": "Control Devices",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 730,
+        "y": 230,
+        "wires": []
+    },
+    {
+        "id": "14c75bcd1b4e2b89",
+        "type": "debug",
+        "z": "7ef85877f7233213",
+        "name": "No Action",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "complete": "true",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 730,
+        "y": 330,
+        "wires": []
+    },
+    {
+        "id": "8a2ba676cf3cb325",
+        "type": "inject",
+        "z": "7ef85877f7233213",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 180,
+        "wires": [
+            [
+                "a304e950f9d14c80"
+            ]
+        ]
+    },
+    {
+        "id": "375f696088bed960",
+        "type": "debug",
+        "z": "7ef85877f7233213",
+        "name": "debug 9",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 360,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "ee33f37e7f6fc9be",
+        "type": "mqtt out",
+        "z": "7ef85877f7233213",
+        "name": "Send Automation Message",
+        "topic": "plantminder/logs",
+        "qos": "0",
+        "retain": "false",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "fc5f394dcb470346",
+        "x": 720,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "0e206d2d69679b41",
+        "type": "mqtt out",
+        "z": "7ef85877f7233213",
+        "name": "Send Control State",
+        "topic": "plantminder/controls/blinds1",
+        "qos": "0",
+        "retain": "false",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "fc5f394dcb470346",
+        "x": 690,
+        "y": 500,
+        "wires": []
+    },
+    {
+        "id": "8820a4b0de22cc3d",
+        "type": "function",
+        "z": "7ef85877f7233213",
+        "name": "Devices state",
+        "func": "// Extracting the payload properties\nconst status = msg.payload.status;\nconst details = msg.payload.details;\nconst action = msg.payload.action;\nconst devices = msg.payload.devices;\n\n// Initialize an empty array for output messages\nconst outputMessages = [];\n\n// Generate a message for each device\ndevices.forEach(device => {\n    outputMessages.push({\n        topic: `plantminder/controls/${device}`,\n        payload: {\n            id: device,\n            name: device.charAt(0).toUpperCase() + device.slice(1), // Capitalize device name\n            state: action === \"close\" // Set state based on action\n        }\n    });\n});\n\n// Return the array of messages for the next node\nreturn [outputMessages];\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 500,
+        "y": 500,
+        "wires": [
+            [
+                "0e206d2d69679b41"
+            ]
+        ]
+    },
+    {
+        "id": "fc5f394dcb470346",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "1d6e060831314bd3aa997e7c72bb0b6e.s1.eu.hivemq.cloud",
+        "port": "8883",
+        "tls": "1f4d8f12511445e0",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": true,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "1f4d8f12511445e0",
+        "type": "tls-config",
+        "name": "",
+        "cert": "",
+        "key": "",
+        "ca": "",
+        "certname": "",
+        "keyname": "",
+        "caname": "",
+        "servername": "",
+        "verifyservercert": true,
+        "alpnprotocol": ""
+    }
+]
