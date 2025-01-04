@@ -1,0 +1,342 @@
+[
+    {
+        "id": "20b169ede9cc4f33",
+        "type": "exec",
+        "z": "40818843b753b768",
+        "command": "/home/karol/venv/bin/python3 /home/karol/light_sensor_gpio.py",
+        "addpay": "",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "Read Light Sensor",
+        "x": 970,
+        "y": 360,
+        "wires": [
+            [
+                "25048801ad696550"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "25048801ad696550",
+        "type": "function",
+        "z": "40818843b753b768",
+        "name": "Parse Light Sensor",
+        "func": "const sensorData = JSON.parse(msg.payload);\nconst lux = sensorData.lux;\n\n// Publish light data to MQTT\nmsg.payload = {\n    value: lux,\n    valueName: \"light\",\n    unit: \"lux\",\n    type: \"light\"\n};\n\n// Store light value for further processing\nmsg.lightValue = lux;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1170,
+        "y": 360,
+        "wires": [
+            [
+                "c7d911d0397e28d4",
+                "cf1996b99141697f"
+            ]
+        ]
+    },
+    {
+        "id": "c7d911d0397e28d4",
+        "type": "mqtt out",
+        "z": "40818843b753b768",
+        "name": "Publish Light Data",
+        "topic": "plantminder/sensors/light",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "fc5f394dcb470346",
+        "x": 1410,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "cf1996b99141697f",
+        "type": "function",
+        "z": "40818843b753b768",
+        "name": "Check Light Level",
+        "func": "const currentState = flow.get('blindsState') || false;\nlet newState;\n\nif (msg.lightValue > 3000) {\n    newState = true; // Blinds should be closed\n    if (currentState === newState) {\n        return null; // Blinds already closed, no action needed\n    }\n    msg.payload = {\n        id: \"blinds1\",\n        name: \"Blinds\",\n        state: newState\n    };\n    msg.gpioPayload = 1; // Trigger GPIO for closing blinds\n    msg.logData = {\n        timestamp: new Date().toISOString(),\n        details: \"Light exceeded 3000 lux. Blinds closed.\",\n        devices: [\"blinds\"],\n        action: \"Close\"\n    };\n} else {\n    newState = false; // Blinds should be open\n    if (currentState === newState) {\n        return null; // Blinds already open, no action needed\n    }\n    msg.payload = {\n        id: \"blinds1\",\n        name: \"Blinds\",\n        state: newState\n    };\n    msg.gpioPayload = 1; // Trigger GPIO for opening blinds\n    msg.logData = {\n        timestamp: new Date().toISOString(),\n        details: \"Light below 3000 lux. Blinds opened.\",\n        devices: [\"blinds\"],\n        action: \"Open\"\n    };\n}\n\nflow.set('blindsState', newState);\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 1370,
+        "y": 400,
+        "wires": [
+            [
+                "e275275865d4943c",
+                "3e91ae05e66d9146",
+                "9e0c0cd4dad04c15",
+                "3d65dc4b8f87e48c"
+            ]
+        ]
+    },
+    {
+        "id": "9a4a4d4d096c40ec",
+        "type": "mqtt in",
+        "z": "40818843b753b768",
+        "name": "MQTT Blinds State",
+        "topic": "plantminder/controls/blinds1/set",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "fc5f394dcb470346",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 970,
+        "y": 540,
+        "wires": [
+            [
+                "a89e91364702cbee"
+            ]
+        ]
+    },
+    {
+        "id": "a89e91364702cbee",
+        "type": "function",
+        "z": "40818843b753b768",
+        "name": "Check MQTT Blinds State Change",
+        "func": "// Retrieve the previous state from flow context\nconst currentState = flow.get('blindsState') || false;\nconst newState = msg.payload.state;\n\nif (newState === currentState) {\n    return null; // No change, no action needed\n}\n\nflow.set('blindsState', newState);\nmsg.gpioPayload = 1; // Trigger GPIO for the state change\nmsg.logData = {\n    timestamp: new Date().toISOString(),\n    details: newState ? \"Blinds closed manually.\" : \"Blinds opened manually.\",\n    devices: [\"blinds\"],\n    action: newState ? \"Close\" : \"Open\"\n};\nmsg.publishPayload = {\n    id: \"blinds1\",\n    name: \"Blinds\",\n    state: newState\n};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 1260,
+        "y": 540,
+        "wires": [
+            [
+                "e275275865d4943c",
+                "3e91ae05e66d9146",
+                "35acd3d4519566dc",
+                "56db4442980d8848"
+            ]
+        ]
+    },
+    {
+        "id": "e275275865d4943c",
+        "type": "trigger",
+        "z": "40818843b753b768",
+        "name": "GPIO Trigger",
+        "op1": "1",
+        "op2": "0",
+        "op1type": "num",
+        "op2type": "num",
+        "duration": "5",
+        "extend": false,
+        "units": "s",
+        "reset": "",
+        "bytopic": "all",
+        "topic": "",
+        "outputs": 1,
+        "x": 1670,
+        "y": 340,
+        "wires": [
+            [
+                "d37d533e7b9002b4"
+            ]
+        ]
+    },
+    {
+        "id": "d37d533e7b9002b4",
+        "type": "rpi-gpio out",
+        "z": "40818843b753b768",
+        "name": "Blinds GPIO Control",
+        "pin": "26",
+        "set": false,
+        "level": "1",
+        "freq": "",
+        "out": "pwm",
+        "bcm": true,
+        "x": 2020,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "3e91ae05e66d9146",
+        "type": "function",
+        "z": "40818843b753b768",
+        "name": "Prepare Logs",
+        "func": "msg.payload = msg.logData;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 1620,
+        "y": 460,
+        "wires": [
+            [
+                "be6f6babb13dedd6"
+            ]
+        ]
+    },
+    {
+        "id": "9e0c0cd4dad04c15",
+        "type": "mqtt out",
+        "z": "40818843b753b768",
+        "name": "Publish Blinds State",
+        "topic": "plantminder/controls/blinds1/set",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "fc5f394dcb470346",
+        "x": 1620,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "35acd3d4519566dc",
+        "type": "mqtt out",
+        "z": "40818843b753b768",
+        "name": "Publish Manual Blinds State",
+        "topic": "plantminder/controls/blinds1/set",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "fc5f394dcb470346",
+        "x": 1620,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "be6f6babb13dedd6",
+        "type": "mqtt out",
+        "z": "40818843b753b768",
+        "name": "Publish Logs",
+        "topic": "plantminder/logs",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "fc5f394dcb470346",
+        "x": 1810,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "56db4442980d8848",
+        "type": "debug",
+        "z": "40818843b753b768",
+        "name": "Debug Manual Blinds Action",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 2020,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "3d65dc4b8f87e48c",
+        "type": "debug",
+        "z": "40818843b753b768",
+        "name": "Debug Blinds Action",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 2020,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "a5eb5f1cdb3a5632",
+        "type": "inject",
+        "z": "40818843b753b768",
+        "name": "Trigger Temperature Read",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "120",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 660,
+        "y": 360,
+        "wires": [
+            [
+                "20b169ede9cc4f33"
+            ]
+        ]
+    },
+    {
+        "id": "fc5f394dcb470346",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "1d6e060831314bd3aa997e7c72bb0b6e.s1.eu.hivemq.cloud",
+        "port": "8883",
+        "tls": "1f4d8f12511445e0",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": true,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "1f4d8f12511445e0",
+        "type": "tls-config",
+        "name": "",
+        "cert": "",
+        "key": "",
+        "ca": "",
+        "certname": "",
+        "keyname": "",
+        "caname": "",
+        "servername": "",
+        "verifyservercert": true,
+        "alpnprotocol": ""
+    }
+]

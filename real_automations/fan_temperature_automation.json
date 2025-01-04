@@ -1,0 +1,494 @@
+[
+    {
+        "id": "6a6ce9a4c05120f9",
+        "type": "exec",
+        "z": "0bdd7f08683c2982",
+        "command": "/home/karol/venv/bin/python3 /home/karol/dht11_read2.py",
+        "addpay": "",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "Read Temperature Sensor",
+        "x": 1070,
+        "y": 320,
+        "wires": [
+            [
+                "b34019266dee54b1"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "b34019266dee54b1",
+        "type": "function",
+        "z": "0bdd7f08683c2982",
+        "name": "Parse Temperature",
+        "func": "const sensorData = JSON.parse(msg.payload);\nconst temperature = sensorData.temperature;\n\n// Publish temperature to MQTT\nmsg.payload = {\n    value: temperature,\n    valueName: \"temperature\",\n    unit: \"°C\",\n    type: \"temperature\"\n};\n\n// Store temperature for further processing\nmsg.tempValue = temperature;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1350,
+        "y": 380,
+        "wires": [
+            [
+                "b46e5d7f104256f0",
+                "a2a45aa79745dfec",
+                "d90768758f7f22c9"
+            ]
+        ]
+    },
+    {
+        "id": "b46e5d7f104256f0",
+        "type": "mqtt out",
+        "z": "0bdd7f08683c2982",
+        "name": "Publish Temperature",
+        "topic": "plantminder/sensors/temperature",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "fc5f394dcb470346",
+        "x": 1590,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "a2a45aa79745dfec",
+        "type": "function",
+        "z": "0bdd7f08683c2982",
+        "name": "Check Temperature",
+        "func": "if (msg.tempValue > 24) {\n    // Turn fan ON\n    flow.set('fanState', true);\n    msg.payload = {\n        id: \"fan1\",\n        name: \"Fan\",\n        state: true\n    };\n    return msg;\n} else {\n    // Turn fan OFF\n    flow.set('fanState', false);\n    msg.payload = {\n        id: \"fan1\",\n        name: \"Fan\",\n        state: false\n    };\n    return msg;\n}",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1550,
+        "y": 420,
+        "wires": [
+            [
+                "5972e1c231bf3e62",
+                "2fce2cad61aa901a",
+                "995eae19ac70f31c"
+            ]
+        ]
+    },
+    {
+        "id": "5972e1c231bf3e62",
+        "type": "mqtt out",
+        "z": "0bdd7f08683c2982",
+        "name": "Publish Fan State",
+        "topic": "plantminder/controls/fan1/set",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "fc5f394dcb470346",
+        "x": 1690,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "2fce2cad61aa901a",
+        "type": "debug",
+        "z": "0bdd7f08683c2982",
+        "name": "Debug Fan State Action",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 1970,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "10b1b849d8c0b47c",
+        "type": "inject",
+        "z": "0bdd7f08683c2982",
+        "name": "Trigger Temperature Read",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "120",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 760,
+        "y": 380,
+        "wires": [
+            [
+                "6a6ce9a4c05120f9"
+            ]
+        ]
+    },
+    {
+        "id": "d0845ee92fdb4ea0",
+        "type": "mqtt in",
+        "z": "0bdd7f08683c2982",
+        "name": "MQTT Fan State",
+        "topic": "plantminder/controls/fan1/set",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "fc5f394dcb470346",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 640,
+        "y": 740,
+        "wires": [
+            [
+                "96160ab6213d4439"
+            ]
+        ]
+    },
+    {
+        "id": "96160ab6213d4439",
+        "type": "function",
+        "z": "0bdd7f08683c2982",
+        "name": "Check State Change",
+        "func": "// Retrieve the previous state from flow context\nlet previousState = flow.get('fanState') || false;\n\n// Get the current state from the incoming message\nlet currentState = msg.payload.state;\n\n// Check if the state has changed\nif (currentState !== previousState) {\n    // Update the flow context with the new state\n    flow.set('fanState', currentState);\n    console.log(currentState,msg.payload)\n\n    // Allow the message to pass through\n    \n    return msg;\n} else {\n    // State is the same, drop the message\n    return null;\n}",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 840,
+        "y": 740,
+        "wires": [
+            [
+                "bedf3de87badcb9a",
+                "5af93b51ddc66067",
+                "3d80fe18bcb271e7"
+            ]
+        ]
+    },
+    {
+        "id": "ff4042e434f0ef6b",
+        "type": "rpi-gpio out",
+        "z": "0bdd7f08683c2982",
+        "name": "Fan GPIO Control",
+        "pin": "26",
+        "set": false,
+        "level": "1",
+        "freq": "",
+        "out": "pwm",
+        "bcm": true,
+        "x": 1410,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "bedf3de87badcb9a",
+        "type": "debug",
+        "z": "0bdd7f08683c2982",
+        "name": "debug 13",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1320,
+        "y": 780,
+        "wires": []
+    },
+    {
+        "id": "a1e3eeae6e7d5208",
+        "type": "debug",
+        "z": "0bdd7f08683c2982",
+        "name": "debug 14",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1300,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "5af93b51ddc66067",
+        "type": "function",
+        "z": "0bdd7f08683c2982",
+        "name": "function 9",
+        "func": "msg.payload = flow.get('fanState')\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1060,
+        "y": 600,
+        "wires": [
+            [
+                "a1e3eeae6e7d5208"
+            ]
+        ]
+    },
+    {
+        "id": "3d80fe18bcb271e7",
+        "type": "function",
+        "z": "0bdd7f08683c2982",
+        "name": "function 10",
+        "func": "if(msg.payload.state===true){\n    msg.payload =1\n}else{\n    msg.payload = 0\n}\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1120,
+        "y": 700,
+        "wires": [
+            [
+                "ff4042e434f0ef6b",
+                "894734e0b3251b2b",
+                "fe0eabcea9996d91"
+            ]
+        ]
+    },
+    {
+        "id": "894734e0b3251b2b",
+        "type": "debug",
+        "z": "0bdd7f08683c2982",
+        "name": "debug 15",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1600,
+        "y": 720,
+        "wires": []
+    },
+    {
+        "id": "218b21bbd4f19511",
+        "type": "inject",
+        "z": "0bdd7f08683c2982",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "0",
+        "payloadType": "num",
+        "x": 1110,
+        "y": 480,
+        "wires": [
+            [
+                "ff4042e434f0ef6b"
+            ]
+        ]
+    },
+    {
+        "id": "fe0eabcea9996d91",
+        "type": "rpi-gpio out",
+        "z": "0bdd7f08683c2982",
+        "name": "Fan GPIO Control",
+        "pin": "26",
+        "set": false,
+        "level": "1",
+        "freq": "",
+        "out": "pwm",
+        "bcm": true,
+        "x": 2030,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "995eae19ac70f31c",
+        "type": "function",
+        "z": "0bdd7f08683c2982",
+        "name": "function 11",
+        "func": "if(msg.payload.state===true){\n    msg.payload=1\n}else{\n    msg.payload=0;\n}\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1810,
+        "y": 420,
+        "wires": [
+            [
+                "fe0eabcea9996d91"
+            ]
+        ]
+    },
+    {
+        "id": "d90768758f7f22c9",
+        "type": "function",
+        "z": "0bdd7f08683c2982",
+        "name": "Check Temperature",
+        "func": "if (msg.tempValue > 24) {\n    msg.payload = 1; // Turn fan ON\n    return msg;\n} else {\n    msg.payload = 0; // Turn fan OFF\n    return msg;\n}",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 1970,
+        "y": 680,
+        "wires": [
+            [
+                "ddc9dbb0d9c23806",
+                "bd3d7cbadcfc2d19"
+            ]
+        ]
+    },
+    {
+        "id": "ddc9dbb0d9c23806",
+        "type": "debug",
+        "z": "0bdd7f08683c2982",
+        "name": "Debug Fan State",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 2190,
+        "y": 760,
+        "wires": []
+    },
+    {
+        "id": "bd3d7cbadcfc2d19",
+        "type": "function",
+        "z": "0bdd7f08683c2982",
+        "name": "Log Temperature Action",
+        "func": "if (msg.tempValue > 24) {\n    msg.payload = {\n        timestamp: new Date().toISOString(),\n        details: \"Temperature exceeded 24°C. Fan turned on.\",\n        devices: [\"fan\"],\n        action: \"Turn on\"\n    };\n    return msg;\n} else {\n    return null; // No log if temperature is normal\n}",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 2190,
+        "y": 880,
+        "wires": [
+            [
+                "0a8467319798aca7",
+                "0258b02057a335d2"
+            ]
+        ]
+    },
+    {
+        "id": "0a8467319798aca7",
+        "type": "mqtt out",
+        "z": "0bdd7f08683c2982",
+        "name": "Publish Logs",
+        "topic": "plantminder/logs",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "fc5f394dcb470346",
+        "x": 2450,
+        "y": 880,
+        "wires": []
+    },
+    {
+        "id": "0258b02057a335d2",
+        "type": "debug",
+        "z": "0bdd7f08683c2982",
+        "name": "Debug Logs",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 2450,
+        "y": 960,
+        "wires": []
+    },
+    {
+        "id": "fc5f394dcb470346",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "1d6e060831314bd3aa997e7c72bb0b6e.s1.eu.hivemq.cloud",
+        "port": "8883",
+        "tls": "1f4d8f12511445e0",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": true,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "1f4d8f12511445e0",
+        "type": "tls-config",
+        "name": "",
+        "cert": "",
+        "key": "",
+        "ca": "",
+        "certname": "",
+        "keyname": "",
+        "caname": "",
+        "servername": "",
+        "verifyservercert": true,
+        "alpnprotocol": ""
+    }
+]
